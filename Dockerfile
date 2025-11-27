@@ -43,4 +43,4 @@ EXPOSE 8000
 
 # Override ENTRYPOINT to run our handler instead of vLLM server
 ENTRYPOINT []
-CMD ["python", "-u", "handler.py"]
+CMD ["/usr/bin/python3", "-u", "handler.py"]
