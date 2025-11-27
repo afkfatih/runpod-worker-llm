@@ -2,7 +2,8 @@
 # OpenAI Compatible vLLM Inference Engine
 # Optimized for fastest inference with full context
 
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
+# CUDA 12.8 required for vLLM GPT-OSS wheels
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -12,12 +13,13 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     gnupg \
+    ca-certificates \
     && add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3.12-dev \
     python3.12-venv \
-    python3-pip \
+    python3.12-distutils \
     git \
     wget \
     curl \
@@ -32,9 +34,10 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Upgrade pip and install uv for faster package management
-RUN pip install --upgrade pip setuptools wheel uv
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install uv
 
-# Install vLLM with GPT-OSS support (special version)
+# Install vLLM with GPT-OSS support (special version for CUDA 12.8)
 RUN uv pip install --pre vllm==0.10.1+gptoss \
     --extra-index-url https://wheels.vllm.ai/gpt-oss/ \
     --extra-index-url https://download.pytorch.org/whl/nightly/cu128 \
@@ -53,8 +56,8 @@ RUN uv pip install \
     uvicorn \
     fastapi
 
-# Production stage
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+# Production stage - use runtime with CUDA 12.8
+FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -67,6 +70,7 @@ ENV VLLM_USE_FLASHINFER_SAMPLER=0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     gnupg \
+    ca-certificates \
     && add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
