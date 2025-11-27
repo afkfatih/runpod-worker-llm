@@ -20,7 +20,8 @@ ENV TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0"
 # Install additional dependencies for RunPod
 RUN pip install --no-cache-dir \
     runpod>=1.7.0 \
-    openai-harmony
+    openai-harmony \
+    psutil
 
 # Create working directory
 WORKDIR /app
@@ -33,21 +34,17 @@ COPY start.sh .
 RUN chmod +x start.sh
 
 # Environment variables for model configuration
-# Optimized for RTX A4500 (20GB) + 62GB RAM - FULL 131K CONTEXT
+# Set to 0 for auto-detection based on system resources
 ENV MODEL_NAME="openai/gpt-oss-20b"
-ENV MAX_MODEL_LEN=131072
-ENV GPU_MEMORY_UTILIZATION=0.98
-ENV MAX_NUM_SEQS=16
+ENV MAX_MODEL_LEN=0
+ENV MAX_NUM_SEQS=0
+ENV CPU_OFFLOAD_GB=-1
 ENV TENSOR_PARALLEL_SIZE=1
 ENV DTYPE="auto"
 ENV TRUST_REMOTE_CODE=true
 ENV ENABLE_CHUNKED_PREFILL=true
-ENV MAX_CONCURRENCY=50
+ENV MAX_CONCURRENCY=100
 ENV DISABLE_LOG_STATS=false
-# CPU offload - use 32GB system RAM for KV cache overflow
-ENV CPU_OFFLOAD_GB=32
-# Swap space for additional memory (GB)
-ENV SWAP_SPACE=8
 
 # Expose port for local testing
 EXPOSE 8000
