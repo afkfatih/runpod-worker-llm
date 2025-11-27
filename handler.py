@@ -36,6 +36,8 @@ MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "300"))
 HF_TOKEN = os.getenv("HF_TOKEN", None)
 # CPU offload for using system RAM (in GB) - helps with limited VRAM
 CPU_OFFLOAD_GB = float(os.getenv("CPU_OFFLOAD_GB", "0"))
+# Swap space in GB for additional memory
+SWAP_SPACE = float(os.getenv("SWAP_SPACE", "4"))
 
 # Global engine instance
 engine: Optional[AsyncLLMEngine] = None
@@ -68,6 +70,7 @@ async def initialize_engine():
         enforce_eager=True,  # Disable CUDA graphs to avoid FlashAttention issues
         enable_prefix_caching=False,  # Disable for compatibility
         cpu_offload_gb=CPU_OFFLOAD_GB,  # Use system RAM for KV cache overflow
+        swap_space=SWAP_SPACE,  # Additional swap space in GB
     )
     
     engine = AsyncLLMEngine.from_engine_args(engine_args)
