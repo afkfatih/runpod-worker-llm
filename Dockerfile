@@ -12,6 +12,10 @@ ENV TRANSFORMERS_CACHE=/runpod-volume/huggingface
 ENV VLLM_USE_FLASHINFER_SAMPLER=0
 # Use V0 engine to avoid FlashAttention 3 requirement
 ENV VLLM_USE_V1=0
+# Use Triton attention backend for non-Hopper GPUs (4090, A100, L40, etc.)
+ENV VLLM_ATTENTION_BACKEND=TRITON_ATTN_VLLM_V1
+# Set CUDA arch for Ampere/Ada (A100=8.0, 4090=8.9, L40=8.9)
+ENV TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0"
 
 # Install additional dependencies for RunPod
 RUN pip install --no-cache-dir \
