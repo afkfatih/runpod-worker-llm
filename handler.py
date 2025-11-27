@@ -34,6 +34,8 @@ TRUST_REMOTE_CODE = os.getenv("TRUST_REMOTE_CODE", "true").lower() == "true"
 ENABLE_CHUNKED_PREFILL = os.getenv("ENABLE_CHUNKED_PREFILL", "true").lower() == "true"
 MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "300"))
 HF_TOKEN = os.getenv("HF_TOKEN", None)
+# CPU offload for using system RAM (in GB) - helps with limited VRAM
+CPU_OFFLOAD_GB = float(os.getenv("CPU_OFFLOAD_GB", "0"))
 
 # Global engine instance
 engine: Optional[AsyncLLMEngine] = None
@@ -65,6 +67,7 @@ async def initialize_engine():
         disable_log_stats=os.getenv("DISABLE_LOG_STATS", "false").lower() == "true",
         enforce_eager=True,  # Disable CUDA graphs to avoid FlashAttention issues
         enable_prefix_caching=False,  # Disable for compatibility
+        cpu_offload_gb=CPU_OFFLOAD_GB,  # Use system RAM for KV cache overflow
     )
     
     engine = AsyncLLMEngine.from_engine_args(engine_args)
