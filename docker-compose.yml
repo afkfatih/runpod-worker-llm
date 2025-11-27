@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  runpod-gpt-oss:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: runpod-gpt-oss-20b
+    
+    # GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    
+    # Environment variables
+    environment:
+      - MODEL_NAME=openai/gpt-oss-20b
+      - MAX_MODEL_LEN=32768
+      - GPU_MEMORY_UTILIZATION=0.95
+      - MAX_NUM_SEQS=256
+      - TENSOR_PARALLEL_SIZE=1
+      - MAX_CONCURRENCY=300
+      - VLLM_USE_FLASHINFER_SAMPLER=0
+      # Uncomment if needed:
+      # - HF_TOKEN=${HF_TOKEN}
+    
+    # Port mapping for local testing
+    ports:
+      - "8000:8000"
+    
+    # Volume for model caching
+    volumes:
+      - ./models:/runpod-volume/huggingface
+    
+    # Resource limits
+    shm_size: '16gb'
+    
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "python", "-c", "import runpod; print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s  # Allow 5 min for model loading
+    
+    # Restart policy
+    restart: unless-stopped
+
+  # Optional: Simple test client
+  test-client:
+    image: curlimages/curl:latest
+    container_name: test-client
+    depends_on:
+      runpod-gpt-oss:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Testing GPT-OSS-20B endpoint...' &&
+        curl -X POST http://runpod-gpt-oss:8000/runsync \
+          -H 'Content-Type: application/json' \
+          -d '{\"input\": {\"messages\": [{\"role\": \"user\", \"content\": \"Hello, are you working?\"}], \"max_tokens\": 100}}'
+      "
+    profiles:
+      - test
+
