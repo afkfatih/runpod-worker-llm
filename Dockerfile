@@ -10,6 +10,8 @@ ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/runpod-volume/huggingface
 ENV TRANSFORMERS_CACHE=/runpod-volume/huggingface
 ENV VLLM_USE_FLASHINFER_SAMPLER=0
+# Use V0 engine to avoid FlashAttention 3 requirement
+ENV VLLM_USE_V1=0
 
 # Install additional dependencies for RunPod
 RUN pip install --no-cache-dir \

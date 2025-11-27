@@ -63,8 +63,8 @@ async def initialize_engine():
         tensor_parallel_size=TENSOR_PARALLEL_SIZE,
         enable_chunked_prefill=ENABLE_CHUNKED_PREFILL,
         disable_log_stats=os.getenv("DISABLE_LOG_STATS", "false").lower() == "true",
-        enforce_eager=False,  # Use CUDA graphs for speed
-        enable_prefix_caching=True,  # Enable prefix caching for repeated prompts
+        enforce_eager=True,  # Disable CUDA graphs to avoid FlashAttention issues
+        enable_prefix_caching=False,  # Disable for compatibility
     )
     
     engine = AsyncLLMEngine.from_engine_args(engine_args)
