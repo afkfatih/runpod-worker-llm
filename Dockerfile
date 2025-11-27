@@ -41,5 +41,6 @@ ENV DISABLE_LOG_STATS=false
 # Expose port for local testing
 EXPOSE 8000
 
-# Start the worker
+# Override ENTRYPOINT to run our handler instead of vLLM server
+ENTRYPOINT []
 CMD ["python", "-u", "handler.py"]
