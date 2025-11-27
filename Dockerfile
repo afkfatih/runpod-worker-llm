@@ -33,18 +33,21 @@ COPY start.sh .
 RUN chmod +x start.sh
 
 # Environment variables for model configuration
+# Optimized for RTX A4500 (20GB) + 62GB RAM - FULL 131K CONTEXT
 ENV MODEL_NAME="openai/gpt-oss-20b"
-ENV MAX_MODEL_LEN=32768
-ENV GPU_MEMORY_UTILIZATION=0.95
-ENV MAX_NUM_SEQS=128
+ENV MAX_MODEL_LEN=131072
+ENV GPU_MEMORY_UTILIZATION=0.98
+ENV MAX_NUM_SEQS=16
 ENV TENSOR_PARALLEL_SIZE=1
 ENV DTYPE="auto"
 ENV TRUST_REMOTE_CODE=true
 ENV ENABLE_CHUNKED_PREFILL=true
-ENV MAX_CONCURRENCY=100
+ENV MAX_CONCURRENCY=50
 ENV DISABLE_LOG_STATS=false
-# CPU offload - use system RAM for KV cache (set based on available RAM)
-ENV CPU_OFFLOAD_GB=16
+# CPU offload - use 32GB system RAM for KV cache overflow
+ENV CPU_OFFLOAD_GB=32
+# Swap space for additional memory (GB)
+ENV SWAP_SPACE=8
 
 # Expose port for local testing
 EXPOSE 8000
