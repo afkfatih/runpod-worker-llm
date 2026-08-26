@@ -209,8 +209,6 @@ def create_sampling_params(request: Dict[str, Any]) -> SamplingParams:
         frequency_penalty=request.get("frequency_penalty", 0.0),
         repetition_penalty=request.get("repetition_penalty", 1.0),
         n=request.get("n", 1),
-        best_of=request.get("best_of", None),
-        use_beam_search=request.get("use_beam_search", False),
         skip_special_tokens=request.get("skip_special_tokens", True),
         ignore_eos=request.get("ignore_eos", False),
         seed=request.get("seed", None),
@@ -334,7 +332,7 @@ async def handler(job: Dict[str, Any]) -> Dict[str, Any]:
 if __name__ == "__main__":
     print("Starting RunPod Serverless Worker for GPT-OSS-20B")
     print(f"Model: {MODEL_NAME}")
-    print(f"Max context: {MAX_MODEL_LEN}")
+    print(f"Max context: {MANUAL_MAX_MODEL_LEN or 'auto-detect'}")
     
     # Start the serverless handler
     runpod.serverless.start({

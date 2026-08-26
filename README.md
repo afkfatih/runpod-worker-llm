@@ -1,57 +1,98 @@
-# RunPod Serverless Worker for GPT-OSS-20B
+# RunPod Serverless Worker — GPT-OSS-20B
 
-OpenAI Compatible Blazing-Fast LLM Endpoint powered by vLLM inference engine, optimized for OpenAI's GPT-OSS-20B model on RunPod Serverless.
+[![Build and Push Docker Image](https://github.com/afkfatih/runpod-worker-llm/actions/workflows/docker-build.yml/badge.svg)](https://github.com/afkfatih/runpod-worker-llm/actions/workflows/docker-build.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![vLLM](https://img.shields.io/badge/engine-vLLM-orange.svg)](https://github.com/vllm-project/vllm)
+
+An OpenAI-compatible, serverless LLM endpoint for [RunPod](https://runpod.io), powered by the
+[vLLM](https://github.com/vllm-project/vllm) inference engine and tuned for OpenAI's
+[GPT-OSS-20B](https://github.com/openai/gpt-oss).
+
+**What makes this different from a plain vLLM container:** the worker probes the GPU and system
+RAM at startup and picks `max_model_len`, `cpu_offload_gb`, `max_num_seqs`, `gpu_memory_utilization`
+and `swap_space` for whatever hardware RunPod happens to schedule it on — so the same image runs
+on a 16 GB card and on an H100 without a config change. See
+[Automatic resource detection](#automatic-resource-detection).
 
 ## Model Specs
 
 | Property | Value |
 |----------|-------|
-| Model | openai/gpt-oss-20b |
-| Parameters | 21B (3.6B active - MoE) |
-| VRAM Required | 16GB minimum |
-| Max Context | 32K tokens |
+| Model | `openai/gpt-oss-20b` |
+| Parameters | 21B total, 3.6B active (MoE) |
+| VRAM required | 16 GB minimum |
+| Max context | up to 131K tokens (hardware dependent — see table below) |
 | Quantization | MXFP4 (native) |
 | License | Apache 2.0 |
 
 ## Quick Deploy on RunPod
 
-### Option 1: Use Pre-built Docker Image
+### Option 1 — Use the pre-built image
 
-1. Go to [RunPod Console](https://runpod.io/console/serverless)
-2. Create new Serverless Endpoint
-3. Use Docker image: `your-dockerhub/runpod-gpt-oss-20b:latest`
-4. Set environment variables (see below)
-5. Select GPU: RTX 4090 (24GB) or better
+The image is built by CI on every push to `master` and published to GitHub Container Registry:
 
-### Option 2: Build Your Own Image
+```
+ghcr.io/afkfatih/runpod-worker-llm:latest
+```
+
+1. Open the [RunPod Serverless console](https://runpod.io/console/serverless)
+2. Create a new Serverless Endpoint
+3. Container image: `ghcr.io/afkfatih/runpod-worker-llm:latest`
+4. Select a GPU — RTX 4090 (24 GB) or better is recommended
+5. Optionally set the environment variables below (all have sane defaults)
+
+> If the package is private on first use, make it public from the repository's
+> **Packages** page so RunPod can pull it without credentials.
+
+### Option 2 — Build it yourself
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/runpod-worker-llm.git
+git clone https://github.com/afkfatih/runpod-worker-llm.git
 cd runpod-worker-llm
 
-# Build the Docker image
-docker build -t your-dockerhub/runpod-gpt-oss-20b:latest .
-
-# Push to Docker Hub
-docker push your-dockerhub/runpod-gpt-oss-20b:latest
+docker build -t ghcr.io/afkfatih/runpod-worker-llm:latest .
+docker push ghcr.io/afkfatih/runpod-worker-llm:latest
 ```
+
+## Automatic resource detection
+
+Every environment variable below defaults to auto-detection. On startup the worker reads the GPU's
+total VRAM and the system RAM, then applies this profile:
+
+| Detected VRAM | Example GPUs | Max context | CPU offload | Max sequences |
+|---|---|---|---|---|
+| ≥ 80 GB | H100, H200, A100-80 | 131,072 | none | 256 |
+| ≥ 48 GB | A6000, L40S, A40 | 131,072 | none | 128 |
+| ≥ 24 GB | RTX 4090, A5000, L4 | 65,536 | none | 64 |
+| ≥ 20 GB | RTX A4500, A4000 | 131,072 if ≥ 24 GB RAM free, else 32,768 | up to 8 GB | 32 |
+| ≥ 16 GB | RTX 4080 | 32,768 | up to 8 GB | 16 |
+| < 16 GB | — | 16,384 | up to 16 GB | 8 |
+
+Below 24 GB the worker offloads model weights to system RAM and swaps KV cache, so a 20 GB card can
+still serve the full 131K context when enough host RAM is available.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MODEL_NAME` | openai/gpt-oss-20b | HuggingFace model ID |
-| `MAX_MODEL_LEN` | 32768 | Maximum context length |
-| `GPU_MEMORY_UTILIZATION` | 0.95 | Fraction of GPU memory to use |
-| `MAX_NUM_SEQS` | 256 | Max concurrent sequences |
-| `TENSOR_PARALLEL_SIZE` | 1 | Number of GPUs for tensor parallelism |
-| `MAX_CONCURRENCY` | 300 | Maximum concurrent requests |
-| `HF_TOKEN` | - | HuggingFace token (if needed) |
+| `MODEL_NAME` | `openai/gpt-oss-20b` | HuggingFace model ID |
+| `MAX_MODEL_LEN` | `0` | Context length. `0` = auto-detect |
+| `MAX_NUM_SEQS` | `0` | Max concurrent sequences. `0` = auto-detect |
+| `CPU_OFFLOAD_GB` | `-1` | GB of model weights to offload to RAM. `-1` = auto-detect |
+| `TENSOR_PARALLEL_SIZE` | `1` | Number of GPUs for tensor parallelism |
+| `MAX_CONCURRENCY` | `100` | Max concurrent requests per worker |
+| `DTYPE` | `auto` | Model dtype |
+| `TRUST_REMOTE_CODE` | `true` | Allow custom modeling code from the Hub |
+| `ENABLE_CHUNKED_PREFILL` | `true` | Chunked prefill for long prompts |
+| `DISABLE_LOG_STATS` | `false` | Silence vLLM throughput logging |
+| `HF_TOKEN` | — | HuggingFace token, for gated models |
+
+`gpu_memory_utilization` and `swap_space` are always derived from detected hardware and have no
+environment override.
 
 ## API Usage
 
-### OpenAI Compatible Chat Completion
+### OpenAI-compatible chat completion
 
 ```python
 from openai import OpenAI
@@ -74,20 +115,7 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-### Streaming Response
-
-```python
-stream = client.chat.completions.create(
-    model="openai/gpt-oss-20b",
-    messages=[{"role": "user", "content": "Write a poem about AI"}],
-    stream=True,
-)
-
-for chunk in stream:
-    print(chunk.choices[0].delta.content or "", end="", flush=True)
-```
-
-### Direct RunPod API Call
+### Direct RunPod API call
 
 ```python
 import runpod
@@ -108,7 +136,17 @@ response = endpoint.run_sync({
 print(response)
 ```
 
-### cURL Example
+### Text completion
+
+Send `prompt` instead of `messages`:
+
+```python
+response = endpoint.run_sync({
+    "input": {"prompt": "Once upon a time", "max_tokens": 256}
+})
+```
+
+### cURL
 
 ```bash
 curl -X POST "https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/runsync" \
@@ -126,15 +164,20 @@ curl -X POST "https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/runsync" \
   }'
 ```
 
+### A note on streaming
+
+Passing `"stream": true` is accepted, but the handler collects every chunk and returns them as a
+single `{"chunks": [...]}` payload — it is not incremental delivery over the wire. Token-by-token
+streaming requires a RunPod generator handler; see [Known limitations](#known-limitations).
+
 ## Reasoning Levels
 
-GPT-OSS supports configurable reasoning effort via system prompt:
+GPT-OSS takes its reasoning effort from the system prompt:
 
-- **Low**: `"Reasoning: low"` - Fast responses for general dialogue
-- **Medium**: `"Reasoning: medium"` - Balanced speed and detail
-- **High**: `"Reasoning: high"` - Deep and detailed analysis
+- `"Reasoning: low"` — fast responses for general dialogue
+- `"Reasoning: medium"` — balanced speed and detail
+- `"Reasoning: high"` — deep and detailed analysis
 
-Example:
 ```python
 messages = [
     {"role": "system", "content": "You are a helpful assistant. Reasoning: high"},
@@ -142,30 +185,19 @@ messages = [
 ]
 ```
 
-## Recommended GPU Configurations
-
-| GPU | VRAM | Recommended Config |
-|-----|------|-------------------|
-| RTX 4090 | 24GB | Single GPU, full context |
-| A10G | 24GB | Single GPU, full context |
-| L4 | 24GB | Single GPU, full context |
-| A100-40GB | 40GB | Single GPU, extended batch |
-| H100 | 80GB | Single GPU, max performance |
-
 ## Performance Tips
 
-1. **Use Network Volume**: Attach RunPod network storage to cache model weights
-2. **Set Active Workers**: Keep at least 1 active worker to avoid cold starts
-3. **Optimize Context**: Use appropriate `MAX_MODEL_LEN` for your use case
-4. **Batch Requests**: Group multiple requests when possible
+1. **Attach a network volume** so model weights are cached between cold starts — this is the single
+   biggest latency win on serverless.
+2. **Keep at least one active worker** if you care about p99 latency.
+3. **Pin `MAX_MODEL_LEN`** to what you actually need; auto-detection is generous and KV cache scales
+   with it.
 
 ## Local Testing
 
 ```bash
-# Using docker-compose
 docker-compose up --build
 
-# Test with curl
 curl -X POST http://localhost:8000/runsync \
   -H "Content-Type: application/json" \
   -d '{"input": {"messages": [{"role": "user", "content": "Hello!"}]}}'
@@ -175,39 +207,38 @@ curl -X POST http://localhost:8000/runsync \
 
 ```
 runpod-worker-llm/
-|-- Dockerfile           # Multi-stage build with vLLM
-|-- handler.py           # RunPod serverless handler
-|-- requirements.txt     # Python dependencies
-|-- start.sh            # Startup script
-|-- docker-compose.yml  # Local testing
-|-- .env.example        # Environment template
-|-- README.md           # This file
+├── Dockerfile                       # Based on vllm/vllm-openai:gptoss
+├── handler.py                       # RunPod serverless handler + resource detection
+├── requirements.txt                 # Python dependencies
+├── start.sh                         # Startup script
+├── docker-compose.yml               # Local testing
+├── .env.example                     # Environment template
+└── .github/workflows/docker-build.yml   # CI → ghcr.io
 ```
+
+## Known limitations
+
+- **vLLM V0 engine.** The image pins `VLLM_USE_V1=0` and `enforce_eager=True` to work around a
+  FlashAttention 3 requirement on non-Hopper GPUs. V0 is deprecated upstream; migrating to V1 is the
+  main open piece of work.
+- **Streaming is buffered,** not incremental — see the note above.
+- **`enable_prefix_caching` is off,** which costs throughput on shared-prefix workloads.
 
 ## Troubleshooting
 
-### Out of Memory
-- Reduce `MAX_MODEL_LEN` (try 16384 or 8192)
-- Reduce `GPU_MEMORY_UTILIZATION` (try 0.90)
-- Use a GPU with more VRAM
+**Out of memory** — lower `MAX_MODEL_LEN` (try 16384 or 8192), or move to a GPU with more VRAM.
 
-### Slow Cold Start
-- Attach network storage with cached model
-- Increase active workers count
-- Use smaller batch sizes initially
+**Slow cold start** — attach network storage with the model cached, and raise the active worker
+count.
 
-### Model Not Loading
-- Check HF_TOKEN if using gated models
-- Verify CUDA compatibility
-- Check GPU driver version
+**Model not loading** — check `HF_TOKEN` for gated models, and verify CUDA/driver compatibility.
 
 ## License
 
-Apache 2.0 - Same as GPT-OSS model
+[Apache 2.0](LICENSE) — same as the GPT-OSS model.
 
 ## Credits
 
 - [OpenAI GPT-OSS](https://github.com/openai/gpt-oss)
 - [vLLM](https://github.com/vllm-project/vllm)
 - [RunPod](https://runpod.io)
-
