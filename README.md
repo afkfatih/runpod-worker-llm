@@ -1,6 +1,5 @@
 # RunPod Serverless Worker — GPT-OSS-20B
 
-[![Build and Push Docker Image](https://github.com/afkfatih/runpod-worker-llm/actions/workflows/docker-build.yml/badge.svg)](https://github.com/afkfatih/runpod-worker-llm/actions/workflows/docker-build.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![vLLM](https://img.shields.io/badge/engine-vLLM-orange.svg)](https://github.com/vllm-project/vllm)
 
@@ -27,32 +26,26 @@ on a 16 GB card and on an H100 without a config change. See
 
 ## Quick Deploy on RunPod
 
-### Option 1 — Use the pre-built image
-
-The image is built by CI on every push to `master` and published to GitHub Container Registry:
-
-```
-ghcr.io/afkfatih/runpod-worker-llm:latest
-```
-
-1. Open the [RunPod Serverless console](https://runpod.io/console/serverless)
-2. Create a new Serverless Endpoint
-3. Container image: `ghcr.io/afkfatih/runpod-worker-llm:latest`
-4. Select a GPU — RTX 4090 (24 GB) or better is recommended
-5. Optionally set the environment variables below (all have sane defaults)
-
-> If the package is private on first use, make it public from the repository's
-> **Packages** page so RunPod can pull it without credentials.
-
-### Option 2 — Build it yourself
+No pre-built image is published — build and push your own, to any registry you already use.
 
 ```bash
 git clone https://github.com/afkfatih/runpod-worker-llm.git
 cd runpod-worker-llm
 
-docker build -t ghcr.io/afkfatih/runpod-worker-llm:latest .
-docker push ghcr.io/afkfatih/runpod-worker-llm:latest
+docker build -t <your-registry>/runpod-worker-llm:latest .
+docker push <your-registry>/runpod-worker-llm:latest
 ```
+
+Then:
+
+1. Open the [RunPod Serverless console](https://runpod.io/console/serverless)
+2. Create a new Serverless Endpoint
+3. Container image: the tag you just pushed
+4. Select a GPU — RTX 4090 (24 GB) or better is recommended
+5. Optionally set the environment variables below (all have sane defaults)
+
+> The image must be pullable by RunPod — either public, or added to your RunPod
+> account as a private registry credential.
 
 ## Automatic resource detection
 
@@ -207,13 +200,12 @@ curl -X POST http://localhost:8000/runsync \
 
 ```
 runpod-worker-llm/
-├── Dockerfile                       # Based on vllm/vllm-openai:gptoss
-├── handler.py                       # RunPod serverless handler + resource detection
-├── requirements.txt                 # Python dependencies
-├── start.sh                         # Startup script
-├── docker-compose.yml               # Local testing
-├── .env.example                     # Environment template
-└── .github/workflows/docker-build.yml   # CI → ghcr.io
+├── Dockerfile           # Based on vllm/vllm-openai:gptoss
+├── handler.py           # RunPod serverless handler + resource detection
+├── requirements.txt     # Python dependencies
+├── start.sh             # Startup script
+├── docker-compose.yml   # Local testing
+└── .env.example         # Environment template
 ```
 
 ## Known limitations
