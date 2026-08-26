@@ -24,10 +24,10 @@ echo "=========================================="
 echo "Starting vLLM inference engine..."
 echo "=========================================="
 
-# Optional: Pre-download model if not exists
+# huggingface_hub reads HF_TOKEN from the environment on its own; passing it on a
+# command line would expose it in the container's process list.
 if [ ! -z "${HF_TOKEN}" ]; then
-    echo "HuggingFace token detected, logging in..."
-    python -c "from huggingface_hub import login; login(token='${HF_TOKEN}')" || true
+    echo "HuggingFace token detected, will be used for gated models."
 fi
 
 # Start the handler
